@@ -1,0 +1,410 @@
+<html>
+
+<head>
+<title>ICG WebGL &mdash; HW1</title>
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+
+<script type="text/javascript" src="glMatrix-0.9.5.min.js"></script>
+<script type="text/javascript" src="webgl-utils.js"></script>
+
+<script id="fragmentShader1" type="fragment">
+    precision mediump float;
+    varying vec4 fragcolor;
+    void main(void) {
+        gl_FragColor = fragcolor;
+    }
+</script>
+
+<script id="vertexShader1" type="vertex">
+    attribute vec3 aVertexPosition;
+    attribute vec3 aFrontColor;
+    attribute vec3 aVertexNormal;
+
+
+    uniform mat4 uMVMatrix;
+    uniform mat4 uPMatrix;
+    uniform mat4 uNMatrix;
+
+    float Shininess = 10.0;
+    uniform vec3 uLightPosition1;
+
+    uniform vec4 uLightAmbient;
+    uniform vec4 uLightDiffuse;
+    uniform vec4 uLightSpecular;
+
+    uniform vec4 uMaterialAmbient;
+    uniform vec4 uMaterialDiffuse;
+    uniform vec4 uMaterialSpecular;
+
+    // mutipling these will make object looks like metal 
+    float Ka = 0.5;
+    float Kd = 0.9;
+    float Ks = 3.0;
+
+
+	varying vec4 fragcolor;
+    uniform sampler2D uSampler;
+
+    void main(void) {
+        vec4 vertex = uMVMatrix * vec4(aVertexPosition, 1.0);
+        vec3 vPosition = vertex.xyz;
+        gl_Position = uPMatrix * vertex;
+
+        vec3 N = vec3(uNMatrix * vec4(aVertexNormal, 1.0));
+        vec3 l1 = normalize(uLightPosition1 - vPosition);
+
+        float lambertTerm1 = dot(N, l1);
+        // Ambient Term
+        vec4 Ia = uLightAmbient * uMaterialAmbient;
+         // Diffuse Term
+        vec4 Id = vec4(0.0, 0.0, 0.0, 1.0);
+        // Specular Term
+        vec4 Is = vec4(0.0, 0.0, 0.0, 1.0);
+
+        if (lambertTerm1 > 0.0) {
+            Id = uLightDiffuse * uMaterialDiffuse * lambertTerm1;
+
+            vec3 E = normalize(-vPosition);                     //need to ask
+            vec3 R = reflect(-l1, N);
+            float specular = pow(max(dot(R, E), 0.0), Shininess);
+
+            Is = uLightSpecular * uMaterialSpecular * specular;
+        }
+        
+        //vec4 fragmentColor = Ka*Ia + Kd*Id + Ks*Is;
+        //fragmentColor.a = 1.0;
+
+        vec4 colorWeight = Ia + Id + Is;
+        //vec4 colorWeight = Ka*Ia + Kd*Id + Ks*Is;
+        vec4 fragmentColor = vec4(aFrontColor, 1.0);
+        fragcolor = vec4((colorWeight * fragmentColor).rgb, fragmentColor.a);
+    }
+</script>
+
+<script id="fragmentShader2" type="fragment">
+    precision mediump float;
+
+    float Shininess = 2.0;
+
+    uniform vec3 uLightPosition1;
+    uniform vec4 uLightAmbient;
+    uniform vec4 uLightDiffuse;
+    uniform vec4 uLightSpecular;
+
+    uniform vec4 uMaterialAmbient;
+    uniform vec4 uMaterialDiffuse;
+    uniform vec4 uMaterialSpecular;
+
+    varying vec3 vNormal;
+    varying vec3 vEyeVec;
+    varying vec3 vPosition;
+    varying vec4 fragcolor;
+
+
+    // mutipling these will make object looks like metal 
+    float Ka = 0.5;
+    float Kd = 0.9;
+    float Ks = 3.0;
+
+
+    void main(void) {
+        vec3 l1 = normalize(uLightPosition1 - vPosition);
+        vec3 n = normalize(vNormal);
+        float lambertTerm = dot(n, l1);
+
+        vec4 Ia = uLightAmbient * uMaterialAmbient;
+        vec4 Id = vec4(0.0, 0.0, 0.0, 1.0);
+        vec4 Is = vec4(0.0, 0.0, 0.0, 1.0);
+        
+        if (lambertTerm > 0.0) {
+            Id = uLightDiffuse * uMaterialDiffuse * lambertTerm;
+            vec3 E = normalize(vEyeVec);
+            vec3 R = reflect(l1, n);
+            float specular = pow(max(dot(R, E), 0.0), Shininess);
+            Is = uLightSpecular * uMaterialSpecular * specular;
+        }
+
+        vec4 colorWeight = Ia + Id + Is;
+        //vec4 colorWeight = Ka*Ia + Kd*Id + Ks*Is;
+
+        gl_FragColor = vec4((colorWeight * fragcolor).rgb, fragcolor.a);
+    }
+</script>
+
+<script id="vertexShader2" type="vertex">
+    attribute vec3 aVertexPosition;
+    attribute vec3 aFrontColor;
+    attribute vec3 aVertexNormal;
+
+
+    uniform mat4 uMVMatrix;
+    uniform mat4 uPMatrix;
+    uniform mat4 uNMatrix;
+    uniform sampler2D uSampler;
+
+    varying vec3 vPosition;
+
+    varying vec3 vNormal;
+    varying vec3 vEyeVec;
+    varying vec4 fragcolor;
+
+
+
+    void main(void) {
+        vec4 vertex = uMVMatrix * vec4(aVertexPosition, 1.0);
+        vPosition = vertex.xyz;
+        vNormal = vec3(uNMatrix * vec4(aVertexNormal, 1.0));
+        gl_Position = uPMatrix * vertex;
+        vEyeVec = -vec3(vertex.xyz);
+
+        vec4 fragmentColor;
+        fragmentColor = vec4(aFrontColor, 1.0);
+        fragcolor = vec4(fragmentColor.rgb, fragmentColor.a);  //need to ask
+    }
+</script>
+
+
+<script type="text/javascript">
+
+    var gl;
+
+    function initGL(canvas) {
+        try {
+            gl = canvas.getContext("experimental-webgl");
+            gl.viewportWidth = canvas.width;
+            gl.viewportHeight = canvas.height;
+        } catch (e) {
+        }
+        if (!gl) {
+            alert("Could not initialise WebGL, sorry :-(");
+        }
+    }
+
+
+    function getShader(gl, id) {
+        var shaderScript = document.getElementById(id);
+        if (!shaderScript) {
+            return null;
+        }
+
+        var str = "";
+        var k = shaderScript.firstChild;
+        while (k) {
+            if (k.nodeType == 3) {
+                str += k.textContent;
+            }
+            k = k.nextSibling;
+        }
+
+        var shader;
+        if (shaderScript.type == "fragment") {
+            shader = gl.createShader(gl.FRAGMENT_SHADER);
+        } else if (shaderScript.type == "vertex") {
+            shader = gl.createShader(gl.VERTEX_SHADER);
+        } else {
+            return null;
+        }
+
+        gl.shaderSource(shader, str);
+        gl.compileShader(shader);
+
+        if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+            alert(gl.getShaderInfoLog(shader));
+            return null;
+        }
+
+        return shader;
+    }
+
+
+    var shaderProgram;
+
+    function initShaders() {
+        var fragmentShader = getShader(gl, "fragmentShader2");
+        var vertexShader = getShader(gl, "vertexShader2")
+
+        shaderProgram = gl.createProgram();
+        gl.attachShader(shaderProgram, vertexShader);
+        gl.attachShader(shaderProgram, fragmentShader);
+        gl.linkProgram(shaderProgram);
+
+        if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) {
+            alert("Could not initialise shaders");
+        }
+
+        gl.useProgram(shaderProgram);
+
+        shaderProgram.vertexPositionAttribute = gl.getAttribLocation(shaderProgram, "aVertexPosition");
+        gl.enableVertexAttribArray(shaderProgram.vertexPositionAttribute);
+
+        shaderProgram.vertexFrontColorAttribute = gl.getAttribLocation(shaderProgram, "aFrontColor");
+        gl.enableVertexAttribArray(shaderProgram.vertexFrontColorAttribute);
+
+        shaderProgram.vertexNormalAttribute = gl.getAttribLocation(shaderProgram, "aVertexNormal");
+        gl.enableVertexAttribArray(shaderProgram.vertexNormalAttribute);
+
+        shaderProgram.pMatrixUniform = gl.getUniformLocation(shaderProgram, "uPMatrix");
+        shaderProgram.mvMatrixUniform = gl.getUniformLocation(shaderProgram, "uMVMatrix");
+        shaderProgram.nMatrixUniform = gl.getUniformLocation(shaderProgram, "uNMatrix");
+        shaderProgram.samplerUniform = gl.getUniformLocation(shaderProgram, "uSampler");
+
+        shaderProgram.lightAmbientUniform = gl.getUniformLocation(shaderProgram, "uLightAmbient");
+        shaderProgram.lightDiffuseUniform = gl.getUniformLocation(shaderProgram, "uLightDiffuse");
+        shaderProgram.lightSpecularUniform = gl.getUniformLocation(shaderProgram, "uLightSpecular");
+
+        shaderProgram.MaterialAmbient = gl.getUniformLocation(shaderProgram, "uMaterialAmbient");
+        shaderProgram.MaterialDiffuse = gl.getUniformLocation(shaderProgram, "uMaterialDiffuse");
+        shaderProgram.MaterialSpecular = gl.getUniformLocation(shaderProgram, "uMaterialSpecular");
+        shaderProgram.lightDirectionUniform1 = gl.getUniformLocation(shaderProgram, "uLightPosition1");
+
+    }
+
+    var mvMatrix = mat4.create();
+    var pMatrix = mat4.create();
+    var nMatrix = mat4.create();
+
+
+    function setMatrixUniforms() {
+        gl.uniformMatrix4fv(shaderProgram.pMatrixUniform, false, pMatrix);
+        gl.uniformMatrix4fv(shaderProgram.mvMatrixUniform, false, mvMatrix);
+        gl.uniformMatrix4fv(shaderProgram.nMatrixUniform, false, nMatrix);
+    }
+
+    function degToRad(degrees) {
+        return degrees * Math.PI / 180;
+    }
+
+
+    var teapotVertexPositionBuffer;
+    var teapotVertexNormalBuffer;
+    var teapotVertexFrontColorBuffer;
+    var teapotVertexBackColorBuffer;
+
+    function handleLoadedTeapot(teapotData) {
+        teapotVertexNormalBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, teapotVertexNormalBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(teapotData.vertexNormals), gl.STATIC_DRAW);
+        teapotVertexNormalBuffer.itemSize = 3;
+        teapotVertexNormalBuffer.numItems = teapotData.vertexNormals.length / 3;
+
+        teapotVertexFrontColorBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, teapotVertexFrontColorBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(teapotData.vertexFrontcolors), gl.STATIC_DRAW);
+        teapotVertexFrontColorBuffer.itemSize = 3;
+        teapotVertexFrontColorBuffer.numItems = teapotData.vertexFrontcolors.length / 3;
+
+        teapotVertexBackColorBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, teapotVertexBackColorBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(teapotData.vertexBackcolors), gl.STATIC_DRAW);
+        teapotVertexBackColorBuffer.itemSize = 3;
+        teapotVertexBackColorBuffer.numItems = teapotData.vertexBackcolors.length / 3;
+
+        teapotVertexPositionBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, teapotVertexPositionBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(teapotData.vertexPositions), gl.STATIC_DRAW);
+        teapotVertexPositionBuffer.itemSize = 3;
+        teapotVertexPositionBuffer.numItems = teapotData.vertexPositions.length / 3;
+    }
+
+
+    function loadTeapot() {
+        var request = new XMLHttpRequest();
+        request.open("GET", "Kangaroo.json");
+        request.onreadystatechange = function () {
+            if (request.readyState == 4) {
+                handleLoadedTeapot(JSON.parse(request.responseText));
+            }
+        }
+        request.send();
+    }
+
+
+    var teapotAngle = 180;
+
+
+    function drawScene() {
+        gl.viewport(0, 0, gl.viewportWidth, gl.viewportHeight);
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+        if (teapotVertexPositionBuffer == null || teapotVertexNormalBuffer == null || teapotVertexFrontColorBuffer == null || teapotVertexBackColorBuffer == null) {
+            return;
+        }
+
+        mat4.perspective(45, gl.viewportWidth / gl.viewportHeight, 0.1, 100.0, pMatrix);
+
+        mat4.identity(mvMatrix);
+
+        mat4.translate(mvMatrix, [0, 0, -5]);
+
+        mat4.rotate(mvMatrix, degToRad(teapotAngle), [0, 1, 0]);
+
+        mat4.set(mvMatrix, nMatrix);
+        mat4.inverse(nMatrix);
+        mat4.transpose(nMatrix);
+        
+        gl.uniform1i(shaderProgram.samplerUniform, 0);
+        gl.bindBuffer(gl.ARRAY_BUFFER, teapotVertexPositionBuffer);
+        gl.vertexAttribPointer(shaderProgram.vertexPositionAttribute, teapotVertexPositionBuffer.itemSize, gl.FLOAT, false, 0, 0);
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, teapotVertexFrontColorBuffer);
+        gl.vertexAttribPointer(shaderProgram.vertexFrontColorAttribute, teapotVertexFrontColorBuffer.itemSize, gl.FLOAT, false, 0, 0);
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, teapotVertexNormalBuffer);
+        gl.vertexAttribPointer(shaderProgram.vertexNormalAttribute, teapotVertexNormalBuffer.itemSize, gl.FLOAT, false, 0, 0);
+
+        setMatrixUniforms();
+        gl.uniform3fv(shaderProgram.lightDirectionUniform1, [-0.25, -0.25, -0.25]);
+        gl.uniform4fv(shaderProgram.lightAmbientUniform, [0.03, 0.03, 0.03, 1.0]);
+        gl.uniform4fv(shaderProgram.lightDiffuseUniform, [1.0, 1.0, 1.0, 1.0]);
+        gl.uniform4fv(shaderProgram.lightSpecularUniform, [1.0, 1.0, 1.0, 1.0]);
+
+        gl.uniform4fv(shaderProgram.MaterialAmbient, [1.0, 1.0, 1.0, 1.0])
+        gl.uniform4fv(shaderProgram.MaterialDiffuse, [0.5, 0.8, 0.1, 1.0]);
+        gl.uniform4fv(shaderProgram.MaterialSpecular, [1.0, 1.0, 1.0, 1.0]);
+        gl.drawArrays(gl.TRIANGLES, 0, teapotVertexPositionBuffer.numItems);
+    }
+
+
+    var lastTime = 0;
+    function animate() {
+        var timeNow = new Date().getTime();
+        if (lastTime != 0) {
+            var elapsed = timeNow - lastTime;
+            teapotAngle += 0.03 * elapsed;
+        }
+        lastTime = timeNow;
+    }
+
+
+    function tick() {
+        requestAnimFrame(tick);
+        drawScene();
+        animate();
+    }
+
+
+    function webGLStart() {
+        var canvas = document.getElementById("ICG-canvas");
+        initGL(canvas);
+        initShaders();
+        loadTeapot();
+
+        gl.clearColor(0.0, 0.2, 0.2, 1.0);
+        gl.enable(gl.DEPTH_TEST);
+
+        tick();
+    }
+
+</script>
+
+</head>
+
+
+<body onload="webGLStart();">
+  
+    <canvas id="ICG-canvas" style="border: none;" width="800" height="600"></canvas>
+    <br/>
+
+</body>
+
+</html>
